@@ -1,5 +1,10 @@
 package html;
 
+/**
+ * Version with only FirstChild implementation (not LastChild)
+ * @author thiba
+ *
+ */
 public class Node {
 	private String tag;
 	private String text;
