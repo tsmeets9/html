@@ -9,6 +9,7 @@ public class Node {
 	private String tag;
 	private String text;
 	private Node firstChild;
+	private Node lastChild;
 	private Node nextSibling;
 	
 	public Node(String tag, String text) {
@@ -17,18 +18,32 @@ public class Node {
 }
 	public void addChild(Node child) {
 		if (firstChild != null) {
-			Node nextChild = firstChild;
-			while (nextChild.nextSibling != null) {
-				nextChild = nextChild.nextSibling;
-			}
-			nextChild.nextSibling = child;
+			lastChild.nextSibling = child;
+			lastChild = child;
 		}
 		else {
 			firstChild = child;
+			lastChild = child;
 		}
 	}
 	
-//	public void removeChild(Node child) { 
+	public void removeChild(Node child) {
+		if (child == firstChild) { 
+			firstChild = firstChild.nextSibling;
+			if (firstChild == null)
+				lastChild = null;
+		} else {
+			Node currentChild = firstChild;
+			while (currentChild.nextSibling != child) 
+				currentChild = currentChild.nextSibling;
+			if (currentChild.nextSibling.nextSibling == null) {
+				lastChild = currentChild;
+			}
+			currentChild.nextSibling = currentChild.nextSibling.nextSibling;
+		}
+	}
+	
+
 //		if (child == firstChild) {
 //			firstChild = firstChild.nextSibling;
 //			if (firstChild == null)
