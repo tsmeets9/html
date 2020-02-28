@@ -8,6 +8,7 @@ package html;
 public class Node {
 	private String tag;
 	private String text;
+	private Node parent;
 	private Node firstChild;
 	private Node lastChild;
 	private Node nextSibling;
@@ -27,7 +28,31 @@ public class Node {
 			firstChild = child;
 			lastChild = child;
 		}
+		child.parent = this;
 	}
+	
+	public void remove() {
+		if (parent != null)
+			parent.removeChild(this);
+	}
+//	public void removeChild() {
+//		if (previousSibling == null) {
+//			parent.firstChild = nextSibling;
+//			if (parent.firstChild == null)
+//				parent.lastChild = null;
+//		} else {
+//			if (nextSibling == null) {
+//				parent.lastChild = previousSibling;
+//			} else {
+//				nextSibling.previousSibling = previousSibling;
+//			}
+//			previousSibling.nextSibling = nextSibling;
+//		}
+//		nextSibling = null;
+//		previousSibling = null;
+//		parent = null;
+//			
+//	}
 	
 	public void removeChild(Node child) {
 		if (child == firstChild) { 
@@ -44,6 +69,7 @@ public class Node {
 		}
 		child.nextSibling = null;
 		child.previousSibling = null;
+		child.parent = null;
 	}
 	
 
