@@ -11,6 +11,7 @@ public class Node {
 	private Node firstChild;
 	private Node lastChild;
 	private Node nextSibling;
+	private Node previousSibling;
 	
 	public Node(String tag, String text) {
 		this.tag = tag;
@@ -19,6 +20,7 @@ public class Node {
 	public void addChild(Node child) {
 		if (firstChild != null) {
 			lastChild.nextSibling = child;
+			child.previousSibling = lastChild;
 			lastChild = child;
 		}
 		else {
@@ -33,32 +35,19 @@ public class Node {
 			if (firstChild == null)
 				lastChild = null;
 		} else {
-			Node currentChild = firstChild;
-			while (currentChild.nextSibling != child) 
-				currentChild = currentChild.nextSibling;
-			if (currentChild.nextSibling.nextSibling == null) {
-				lastChild = currentChild;
+			if (child.nextSibling == null) {
+				lastChild = child.previousSibling;
+			} else {
+				child.nextSibling.previousSibling = child.previousSibling;
 			}
-			currentChild.nextSibling = currentChild.nextSibling.nextSibling;
+			child.previousSibling.nextSibling = child.nextSibling;
 		}
+		child.nextSibling = null;
+		child.previousSibling = null;
 	}
 	
 
-//		if (child == firstChild) {
-//			firstChild = firstChild.nextSibling;
-//			if (firstChild == null)
-//				lastChild = null;
-//		}
-//		else {
-//			Node currentChild = firstChild;
-//			while (currentChild.nextSibling != child)
-//				currentChild= currentChild.nextSibling;
-//			if (currentChild.nextSibling.nextSibling == null)
-//				lastChild = currentChild;
-//			currentChild.nextSibling = currentChild.nextSibling.nextSibling;
-//		}
-//	}
-	
+
 	public String toString() {
 		if (text != null)
 			return text;
