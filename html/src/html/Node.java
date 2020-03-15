@@ -1,5 +1,6 @@
 package html;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 
 /**
@@ -28,15 +29,15 @@ public class Node {
 		 * head is kind van html dus met html ook parent zijn van head
 		 * 
 		 * @invar If this node has a parent, this node is among it's parent's children.
-		 * 		  | parent == null || Arrays.stream(parents.children).anyMatch(c -> c == this)
+		 * 		  | parent == null || parents.children.stream.anyMatch(c -> c == this) //DIT IS EEN AANPASSING iets.stream
 		 * @invar For each child of this node, the child's parent equals this node.
-		 * 		  | Arrays.stream(children).allMatch(c -> c != null && c.parent == this)
+		 * 		  | children.stream.allMatch(c -> c != null && c.parent == this)
 		 * 
 		 */
 	private String tag;
 	private String text;
 	private Node parent;
-	private Node[] children;
+	private ArrayList<Node> children;
 	
 	public String getTag() {return tag; }
 	public String getText() {return text;}
@@ -48,21 +49,18 @@ public class Node {
 		// return children; //FOUT: REPRESENTATION EXPOSURE kan dan bv nulpointers erin steken, willen we vermijden. 
 		// we willen dat one code goed werkt zelfs als de klantcode niet tegoei werkt, interne objecten niet doorgeven aan de klant
 		// representation object
-		return Arrays.copyOf(children, children.length);
+		return children.toArray(new Node[0]); // new Node[0] meegeven om Array van Node te krijgen, anders lukt dat niet
 	}
 	
 	
 	public Node(String tag, String text) {
 		this.tag = tag;
 		this.text = text;
-		this.children = new Node[0];
+		this.children = new ArrayList<Node>();
 }
 	
 	public void addChild(Node child) {
-		Node[] newChildren = new Node[children.length + 1];
-		System.arraycopy(children, 0, newChildren, 0, children.length);
-		newChildren[children.length] = child;
-		children = newChildren;
+		children.add(child);
 		child.parent = this;
 	}
 	
@@ -90,25 +88,19 @@ public class Node {
 //	}
 	
 	public void removeChild(Node child) {
-		Node[] newChildren = new Node[children.length -1];
-		int index = 0;
-		while (children[index] != child)
-			index++;
-		System.arraycopy(children, 0, newChildren, 0, index);
-		System.arraycopy(children, index + 1, newChildren, index, children.length - index - 1);
-		children = newChildren;
+		children.remove(child);
 		child.parent = null;
 	}
 	
 
-
+	// enhanced for loop blijft werken, lus iets anders
 	public String toString() {
 		if (text != null)
 			return text;
 		String result = "<" + tag + ">";
 		for (Node child: children)
-		// for (int i = 0; i < children.length; i++) {
-			// Node child = children[i]
+		// for (int i = 0; i < children.size(); i++) {
+			// Node child = children.get(i);
 			result += child.toString();
 		result += "</" + tag + ">";
 		return result;
