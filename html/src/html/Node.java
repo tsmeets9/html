@@ -2,6 +2,9 @@ package html;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Objects;
+import java.util.stream.IntStream;
 
 /**
  * DIT ZIJN INVARIANTEN DIE DE GEBRUIKER KAN ZIEN, die de client kan zien
@@ -35,7 +38,7 @@ public class Node {
 		 * 
 		 */
 	private String tag;
-	private String text;
+	protected String text;
 	private Node parent;
 	private ArrayList<Node> children;
 	
@@ -52,13 +55,72 @@ public class Node {
 		return children.toArray(new Node[0]); // new Node[0] meegeven om Array van Node te krijgen, anders lukt dat niet
 	}
 	
+	/**
+	 * Als je equals equals gebruikt gaat er nagegaan worden of het hetzelfde stringobject is (geTag() == tag) 
+	 * We willen alleen dat de lijst van tekens het zelfde is 
+	 * Maar geTag().equals(tag) gaan we niet gebruiken, omdat er geen methodes op null pointers opgeroepen mogen worden 
+	 * Alleen equals oproepen als eerste argument niet null is 
+	 * @post | Objects.equals(getTag(), tag)
+	 * @post | Objects.equals(getText(), text)
+	 * @post | getChildren().length == 0
+	 * @post | getParent() == null
+	 * 
+	 * 
+	 */
 	
+	public ArrayList<Node> getDescendants() {
+		ArrayList<Node> result = new ArrayList<Node>();
+		result.add(this);
+		for (Node child : children)
+			result.addAll(child.getDescendants());
+		return result;
+	}
 	public Node(String tag, String text) {
 		this.tag = tag;
 		this.text = text;
 		this.children = new ArrayList<Node>();
 }
+	public Node getRootNode() { 
+		if (parent == null)
+			return this;
+		else {
+			return parent.getRootNode();
+		}
+	}
 	
+	public HashMap<Node, NodeState> getNodesMap() {
+		ArrayList<Node> nodes = getRootNode().getDescendants();
+		HashMap<Node,NodeState> map = new HashMap<Node, NodeState>();
+		for (Node node : nodes) {
+			map.put(node, new NodeState(node.getTag(), 
+					node.getText(),
+					node.getParent(),
+					Arrays.asList(node.getChildren());
+		}
+		return map;
+		
+	}
+	/**
+	 * 
+	 * @pre |child != null
+	 * @pre |child.getParent() == null
+	 * We willen ook dat een kind geen afstammeling is van zichzelf. We willen geen lussen in de boom, to string zal dan ook niet werken
+	 * @pre | !child.getDescendants().contains(this)
+	 * @post |child.getParent() == this
+	 * @post |getChildren().length == old(getChildren()).length + 1
+	 * @post | getChildren()[getChildren().length - 1] == child
+	 * @post | IntStream.range(0, old(getChildren()).length).allMatch(i-> getChildren()[i] == old(getChildren())[i])
+	 * Je moet ook voor de hele groep van objecten zeggen wat er veranderd is en wat er niet veranderd is
+	 * @post | getNodesMap().equals(old(getNodesMap()))
+	 * @post
+	 * 		| getNodesMap().keySet().stream().allMatch( n -> 
+	 * 		| n == this || n == child ||
+	 * 		| getNodesMap().get(n).equals(old(getNodesMap()).get(n)))
+	 * @post |Objects.equals(getText(), old(getText()))
+	 * @post |Objects.equals(getTag(), old(getTag()))
+	 * 
+	 * 
+	 */
 	public void addChild(Node child) {
 		children.add(child);
 		child.parent = this;
