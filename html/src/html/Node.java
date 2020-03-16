@@ -3,168 +3,253 @@ package html;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.stream.IntStream;
+import java.util.Optional;
+
+import logicalcollections.LogicalMap;
+import logicalcollections.LogicalList;
+import logicalcollections.LogicalSet;
 
 /**
- * DIT ZIJN INVARIANTEN DIE DE GEBRUIKER KAN ZIEN, die de client kan zien
- * Version with only FirstChild implementation (not LastChild)
- * @author thiba
- * @invar | (getTag() == null) == (getText() != null 
- * @invar | getParent() == null || Arrays.stream(getParents().getChildren()).anyMatch(c -> c == this)
- * @invar | Arrays.stream(getChildren()).anyMatch(c -> c!= null && c.getParent() == this)
- *
+ * Each instance of this class represents an element node or a text node in an HTML document.
+ * 
+ * @invar | getPeerGroupState() != null
  */
 public class Node {
+
+	/**
+	 * Returns the state of this node as a map that maps property names to property
+	 * values.
+	 * 
+	 * @post | result != null
+	 * @post | result.equals(Map.of(
+	 *       |     "parent", Optional.ofNullable(getParent()),
+	 *       |     "children", getChildren()))
+	 */
+	public Map<String, Object> getState() {
+		return getStatePrivate();
+	}
 	
-	// INTERNE DOCUMENTATIE, PER METHODE KAN JE CHECKEN OF DIT ZO IS. ALS ZE IN HET BEGIN VAN EEN METHODE GELDEN, GELDEN ZE DAN OOK OP HET EINDE
+	/**
+	 * @pre | children != null
+	 */
+	private Map<String, Object> getStatePrivate() {
+		return Map.of(
+				"parent", Optional.ofNullable(parent),
+				"children", List.copyOf(children));
+	}
 	
-		/* ALtijd goed definiëren wat de geldige toestanden zijn
-		 * @invar Either {@code tag} or {@code text} must be non-null
-		 * 		|tag != null || text != null
-		 * Either {@code tag} or {@code text} must be null
-		 * 		|tag == null || text == null
-		 * 
-		 * zelfde als vorige twee beknopter geschreven:
-		 * @invar | (tag == null) == (text != null)
-		 * @invar |children != null    //kan je kiezen of je dit wilt, we moeten kiezen hoe we dan een lege lijst kinderen maken 
-		 * @invar |parent == null 
-		 * head is kind van html dus met html ook parent zijn van head
-		 * 
-		 * @invar If this node has a parent, this node is among it's parent's children.
-		 * 		  | parent == null || parents.children.stream.anyMatch(c -> c == this) //DIT IS EEN AANPASSING iets.stream
-		 * @invar For each child of this node, the child's parent equals this node.
-		 * 		  | children.stream.allMatch(c -> c != null && c.parent == this)
-		 * 
-		 */
-	private String tag;
-	protected String text;
+	/**
+	 * Returns a map that maps each node related directly or indirectly to this node
+	 * to its state, represented as a map from property names to property values.
+	 * 
+	 * @post | result != null
+	 * @post
+	 *    | result.equals(LogicalMap.<Node, Map<String, Object>>matching(map ->
+	 *    |
+	 *    |     // This node is in its peer group
+	 *    |     map.containsKey(this) &&
+	 *    |
+	 *    |     map.keySet().allMatch(node ->
+	 *    |
+	 *    |         // Each peer node's children are not null and are in its peer group
+	 *    |         node.getChildren().stream().allMatch(child -> child != null && map.containsKey(child)) &&
+	 *    |
+	 *    |         // No peer node's list of children contains the same node more than once 
+	 *    |         LogicalList.distinct(node.getChildren()) &&
+	 *    |
+	 *    |         // Each peer node's parent, if any, is in its peer group
+	 *    |         (node.getParent() == null || map.containsKey(node.getParent())) &&
+	 *    |
+	 *    |         map.containsEntry(node, node.getState())
+	 *    |
+	 *    |     ) &&
+	 *    |
+	 *    |     map.keySet().allMatch(node ->
+	 *    |
+	 *    |         // Each peer node N's children have N as their parent 
+	 *    |         node.getChildren().stream().allMatch(child -> child.getParent() == node) &&
+	 *    |
+	 *    |         // Each peer node N's parent, if any, has N among its children 
+	 *    |         (node.getParent() == null || node.getParent().getChildren().contains(node)) &&
+	 *    |
+	 *    |         // No node has itself among its ancestors
+	 *    |         !LogicalSet.<Node>matching(ancestors ->
+	 *    |             (node.getParent() == null || ancestors.contains(node.getParent())) &&
+	 *    |             ancestors.allMatch(ancestor ->
+	 *    |                 ancestor.getParent() == null || ancestors.contains(ancestor.getParent()))
+	 *    |         ).contains(node) 
+	 *    |     ))
+	 *    | )
+	 */
+	public Map<Node, Map<String, Object>> getPeerGroupState() {
+		return getPeerGroupStatePrivate();
+	}
+	
+	private Map<Node, Map<String, Object>> getPeerGroupStatePrivate() {
+		return LogicalMap.matching(map ->
+			map.containsKey(this) &&
+			map.keySet().allMatch(node ->
+				node.children != null &&
+				node.children.stream().allMatch(child -> child != null && map.containsKey(child)) &&
+				LogicalList.distinct(node.children) &&
+				(node.parent == null || map.containsKey(node.parent)) &&
+				map.containsEntry(node, node.getStatePrivate())
+			) &&
+			map.keySet().allMatch(node ->
+				node.children.stream().allMatch(child -> child.parent == node) &&
+				(node.parent == null || node.parent.children.contains(node)) &&
+				!LogicalSet.<Node>matching(ancestors ->                                              
+				    (node.parent == null || ancestors.contains(node.parent)) &&            
+				    ancestors.allMatch(ancestor ->                                                   
+				        ancestor.parent == null || ancestors.contains(ancestor.parent))    
+				).contains(node)                                                                     
+			)
+		);
+	}
+	
+	/**
+	 * @invar | getPeerGroupStatePrivate() != null
+	 * @peerObject
+	 */
 	private Node parent;
+	/**
+	 * @representationObject
+	 * @peerObjects
+	 */
 	private ArrayList<Node> children;
 	
-	public String getTag() {return tag; }
-	public String getText() {return text;}
-	
-	public Node getParent() {return parent; }
-	// peer object 
-	
-	public Node[] getChildren() { 
-		// return children; //FOUT: REPRESENTATION EXPOSURE kan dan bv nulpointers erin steken, willen we vermijden. 
-		// we willen dat one code goed werkt zelfs als de klantcode niet tegoei werkt, interne objecten niet doorgeven aan de klant
-		// representation object
-		return children.toArray(new Node[0]); // new Node[0] meegeven om Array van Node te krijgen, anders lukt dat niet
-	}
+	public Node getParent() { return parent; }
 	
 	/**
-	 * Als je equals equals gebruikt gaat er nagegaan worden of het hetzelfde stringobject is (geTag() == tag) 
-	 * We willen alleen dat de lijst van tekens het zelfde is 
-	 * Maar geTag().equals(tag) gaan we niet gebruiken, omdat er geen methodes op null pointers opgeroepen mogen worden 
-	 * Alleen equals oproepen als eerste argument niet null is 
-	 * @post | Objects.equals(getTag(), tag)
-	 * @post | Objects.equals(getText(), text)
-	 * @post | getChildren().length == 0
-	 * @post | getParent() == null
-	 * 
-	 * 
+	 * @post | result != null
 	 */
-	
-	public ArrayList<Node> getDescendants() {
-		ArrayList<Node> result = new ArrayList<Node>();
-		result.add(this);
-		for (Node child : children)
-			result.addAll(child.getDescendants());
-		return result;
-	}
-	public Node(String tag, String text) {
-		this.tag = tag;
-		this.text = text;
-		this.children = new ArrayList<Node>();
-}
-	public Node getRootNode() { 
-		if (parent == null)
-			return this;
-		else {
-			return parent.getRootNode();
-		}
+	public List<Node> getChildren() {
+		return List.copyOf(children);
 	}
 	
-	public HashMap<Node, NodeState> getNodesMap() {
-		ArrayList<Node> nodes = getRootNode().getDescendants();
-		HashMap<Node,NodeState> map = new HashMap<Node, NodeState>();
-		for (Node node : nodes) {
-			map.put(node, new NodeState(node.getTag(), 
-					node.getText(),
-					node.getParent(),
-					Arrays.asList(node.getChildren());
-		}
-		return map;
-		
-	}
 	/**
+	 * Initializes this HTML document node either as an element node with a
+	 * given tag, or as a text node with a given text content.
 	 * 
-	 * @pre |child != null
-	 * @pre |child.getParent() == null
-	 * We willen ook dat een kind geen afstammeling is van zichzelf. We willen geen lussen in de boom, to string zal dan ook niet werken
-	 * @pre | !child.getDescendants().contains(this)
-	 * @post |child.getParent() == this
-	 * @post |getChildren().length == old(getChildren()).length + 1
-	 * @post | getChildren()[getChildren().length - 1] == child
-	 * @post | IntStream.range(0, old(getChildren()).length).allMatch(i-> getChildren()[i] == old(getChildren())[i])
-	 * Je moet ook voor de hele groep van objecten zeggen wat er veranderd is en wat er niet veranderd is
-	 * @post | getNodesMap().equals(old(getNodesMap()))
-	 * @post
-	 * 		| getNodesMap().keySet().stream().allMatch( n -> 
-	 * 		| n == this || n == child ||
-	 * 		| getNodesMap().get(n).equals(old(getNodesMap()).get(n)))
-	 * @post |Objects.equals(getText(), old(getText()))
-	 * @post |Objects.equals(getTag(), old(getTag()))
+	 * @post This node's list of children is empty.
+	 *    | getChildren().isEmpty()
+	 * @post This node is a root node.
+	 *    | getParent() == null
+	 */
+	public Node() {
+		this.children = new ArrayList<Node>();
+	}
+	
+	/**
+	 * Adds the given node to the end of this node's list of children.
 	 * 
-	 * 
+	 * @pre {@code child} is not null.
+	 *    | child != null
+	 * @pre The given node is a root node.
+	 *    | child.getParent() == null
+	 * @pre The given node is not an ancestor of this node.
+	 *      Equivalently: the given node is not in this node's peer group.
+	 *    | !this.getPeerGroupState().containsKey(child)
+	 * @mutates | this, child
+	 * @post This node's list of children equals its old list of children with the given node added to the end.
+	 *    | getChildren().equals(LogicalList.plus(old(getChildren()), child))
+	 * @post The given node's parent equals this node.
+	 *    | child.getParent() == this
+	 * @post This node's other properties have remained unchanged.
+	 *    | LogicalMap.equalsExcept(getState(), old(getState()), "children")
+	 * @post The given node's other properties have remained unchanged.
+	 *    | LogicalMap.equalsExcept(child.getState(), old(child.getState()), "parent")
+	 * @post The existing nodes in this node's peer group, except for this node, have remained unchanged.
+	 *    | LogicalMap.extendsExcept(
+	 *    |     getPeerGroupState(), old(getPeerGroupState()), this)
+	 * @post The existing nodes in the given node's peer group, except for the given node, have remained unchanged.
+	 *    | LogicalMap.extendsExcept(
+	 *    |     child.getPeerGroupState(), old(child.getPeerGroupState()), child)
 	 */
 	public void addChild(Node child) {
 		children.add(child);
 		child.parent = this;
 	}
 	
-	public void remove() {
-		if (parent != null)
-			parent.removeChild(this);
-	}
-//	public void removeChild() {
-//		if (previousSibling == null) {
-//			parent.firstChild = nextSibling;
-//			if (parent.firstChild == null)
-//				parent.lastChild = null;
-//		} else {
-//			if (nextSibling == null) {
-//				parent.lastChild = previousSibling;
-//			} else {
-//				nextSibling.previousSibling = previousSibling;
-//			}
-//			previousSibling.nextSibling = nextSibling;
-//		}
-//		nextSibling = null;
-//		previousSibling = null;
-//		parent = null;
-//			
-//	}
-	
+	/**
+	 * Removes the given node from this node's list of children.
+	 * 
+	 * @pre {@code child} is not null.
+	 *    | child != null
+	 * @pre The given node is a root node.
+	 *    | getChildren().contains(child)
+	 * @mutates this
+	 * @post This node's list of children equals its old list of children with the given node removed.
+	 *    | getChildren().equals(LogicalList.minus(old(getChildren()), child))
+	 * @post The given node is a root node.
+	 *    | child.getParent() == null
+	 * @post This node's other properties have remained unchanged.
+	 *    | LogicalMap.equalsExcept(getState(), old(getState()), "children")
+	 * @post The given node's other properties have remained unchanged.
+	 *    | LogicalMap.equalsExcept(child.getState(), old(child.getState()), "parent")
+	 * @post The nodes in this node's peer group, except for this node, have remained unchanged.
+	 *    | LogicalMap.extendsExcept(
+	 *    |     old(getPeerGroupState()), getPeerGroupState(), this)
+	 * @post The nodes in the given node's peer group, except for the given node, have remained unchanged.
+	 *    | LogicalMap.extendsExcept(
+	 *    |     old(child.getPeerGroupState()), child.getPeerGroupState(), child)
+	 */
 	public void removeChild(Node child) {
 		children.remove(child);
 		child.parent = null;
 	}
 	
-
-	// enhanced for loop blijft werken, lus iets anders
-	public String toString() {
-		if (text != null)
-			return text;
-		String result = "<" + tag + ">";
-		for (Node child: children)
-		// for (int i = 0; i < children.size(); i++) {
-			// Node child = children.get(i);
-			result += child.toString();
-		result += "</" + tag + ">";
-		return result;
+	/**
+	 * Removes this node from its parent's list of children.
+	 * 
+	 * @pre This node is not a root node.
+	 *    | getParent() != null
+	 * @mutates this
+	 * @post This node's list of children equals its old list of children with the given node removed.
+	 *    | old(getParent()).getChildren().equals(LogicalList.minus(old(getParent().getChildren()), this))
+	 * @post The given node is a root node.
+	 *    | getParent() == null
+	 * @post This node's parent's other properties have remained unchanged.
+	 *    | LogicalMap.equalsExcept(old(getParent()).getState(), old(getParent().getState()), "children")
+	 * @post This node's other properties have remained unchanged.
+	 *    | LogicalMap.equalsExcept(getState(), old(getState()), "parent")
+	 * @post The nodes in this node's old parent's peer group, except for this node's old parent,
+	 *       have remained unchanged.
+	 *    | LogicalMap.extendsExcept(
+	 *    |     old(getParent().getPeerGroupState()), old(getParent()).getPeerGroupState(), old(getParent()))
+	 * @post The nodes in this node's peer group, except for this node, have remained unchanged.
+	 *    | LogicalMap.extendsExcept(
+	 *    |     old(getPeerGroupState()), getPeerGroupState(), this)
+	 */
+	public void remove() {
+		parent.removeChild(this);
 	}
+	
+	/**
+	 * Returns a textual representation of this HTML document node and its descendants.
+	 * 
+	 * @post | result != null
+	 */
+	public String toString() {
+		if (this instanceof TextNode) {
+			return ((TextNode)this).getText();
+		} else {
+			String result = "<" + ((ElementNode)this).getTag()+ ">";
+			for (Node child : children) {
+			//for (int i = 0; i < children.size(); i++) {
+				//Node child = children.get(i);
+				result += child.toString();
+			}
+			result += "</" + ((ElementNode)this).getTag() + ">";
+			return result;
+		}
+	}
+	
+	public int getTotalNbCharacters() {
+		throw new AssertionError("Not yet implemented");
+	}
+
 }
